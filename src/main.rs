@@ -1,3 +1,4 @@
+use ammonia::clean;
 use clap::Parser;
 use comrak::{markdown_to_html, ComrakOptions};
 use std::ffi::OsString;
@@ -18,6 +19,11 @@ struct Args {
     path: String,
 }
 
+struct Templates {
+    index: Option<String>,
+    page: Option<String>,
+}
+
 fn main() -> std::io::Result<()> {
     let cwd = env::current_dir()?;
     let cwd_path = cwd.as_path();
@@ -27,11 +33,25 @@ fn main() -> std::io::Result<()> {
     let project_path = cwd_path.join(path);
 
     let pages_dir = project_path.join(Path::new("pages"));
+    let templates_dir = project_path.join(Path::new("templates"));
     let out_dir = project_path.join("dist");
 
-    if !out_dir.exists() {
-        fs::create_dir(&out_dir)?;
+    if out_dir.exists() {
+        fs::remove_dir(&out_dir).expect("Could not remove output directory");
     }
+
+    fs::create_dir(&out_dir)?;
+
+    let templates = Templates {
+        index: match fs::read_to_string(templates_dir.join("index.html")) {
+            Ok(html) => Some(html),
+            Err(_) => None,
+        },
+        page: match fs::read_to_string(templates_dir.join("page.html")) {
+            Ok(html) => Some(html),
+            Err(_) => None,
+        },
+    };
 
     for entry in WalkDir::new(&pages_dir).into_iter().filter_map(|e| e.ok()) {
         let f_name = entry.file_name().to_string_lossy();
@@ -45,7 +65,7 @@ fn main() -> std::io::Result<()> {
             let contents =
                 fs::read_to_string(&path).expect("Should have been able to read the file");
 
-            let mut html_file = relative_path
+            let html_file = relative_path
                 .file_stem()
                 .unwrap()
                 .to_string_lossy()
@@ -53,19 +73,29 @@ fn main() -> std::io::Result<()> {
 
             let out_path = match html_file.as_str() {
                 "index" => out_dir.join(relative_path.parent().unwrap()),
-                _ => out_dir.join(relative_path.parent().unwrap().join(html_file)),
+                _ => out_dir.join(relative_path.parent().unwrap().join(&html_file)),
             };
 
             std::fs::create_dir_all(&out_path).unwrap();
 
-            let html = markdown_to_html(&contents, &ComrakOptions::default());
+            let template = match html_file.as_str() {
+                "index" => &templates.index,
+                _ => &templates.page,
+            };
+
+            let md_html = markdown_to_html(&contents, &ComrakOptions::default());
+            let unsafe_html = match template {
+                Some(template_html) => template_html.replace("{{ content }}", md_html.as_str()),
+                None => md_html,
+            };
+            let safe_html = clean(&unsafe_html);
 
             println!("{}", out_path.display());
 
             let mut out_file =
                 File::create(out_path.join("index.html")).expect("Could not create file");
 
-            out_file.write_all(html.as_bytes());
+            out_file.write_all(safe_html.as_bytes());
         }
     }
 
