@@ -1,22 +1,21 @@
+mod tailwind;
+
+use tailwind::Tailwind;
+
 use ammonia::clean;
 use clap::Parser;
 use comrak::{markdown_to_html, ComrakOptions};
-use std::ffi::OsString;
-use std::fs::{self, read_dir, File, ReadDir};
+use std::fs::{self, File};
 use std::io::Write;
-use std::{
-    env,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
+use std::{env, path::Path};
 use walkdir::WalkDir;
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Name of the person to greet
-    #[arg(short, long)]
-    path: String,
+    path: PathBuf,
 }
 
 struct Templates {
@@ -37,10 +36,12 @@ fn main() -> std::io::Result<()> {
     let out_dir = project_path.join("dist");
 
     if out_dir.exists() {
-        fs::remove_dir(&out_dir).expect("Could not remove output directory");
+        fs::remove_dir_all(&out_dir).expect("Could not remove output directory");
     }
 
     fs::create_dir(&out_dir)?;
+
+    Tailwind::build(&out_dir)?;
 
     let templates = Templates {
         index: match fs::read_to_string(templates_dir.join("index.html")) {
@@ -88,14 +89,14 @@ fn main() -> std::io::Result<()> {
                 Some(template_html) => template_html.replace("{{ content }}", md_html.as_str()),
                 None => md_html,
             };
-            let safe_html = clean(&unsafe_html);
+            let safe_html = &unsafe_html;
 
             println!("{}", out_path.display());
 
             let mut out_file =
                 File::create(out_path.join("index.html")).expect("Could not create file");
 
-            out_file.write_all(safe_html.as_bytes());
+            out_file.write_all(safe_html.as_bytes())?;
         }
     }
 

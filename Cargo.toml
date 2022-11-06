@@ -9,5 +9,6 @@ edition = "2021"
 ammonia = "3.2.1"
 clap = { version = "4.0.10", features = ["derive"] }
 comrak = "0.14.0"
+include_dir = {version = "0.7.3", features = ["glob"]}
 tera = "1.17.1"
 walkdir = "2.3.2"
