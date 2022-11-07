@@ -2,7 +2,7 @@ mod tailwind;
 
 use tailwind::Tailwind;
 
-use ammonia::clean;
+use ammonia;
 use clap::Parser;
 use comrak::{markdown_to_html, ComrakOptions};
 use std::fs::{self, File};
@@ -84,19 +84,18 @@ fn main() -> std::io::Result<()> {
                 _ => &templates.page,
             };
 
-            let md_html = markdown_to_html(&contents, &ComrakOptions::default());
-            let unsafe_html = match template {
+            let md_html = ammonia::clean(&markdown_to_html(&contents, &ComrakOptions::default()));
+            let html = match template {
                 Some(template_html) => template_html.replace("{{ content }}", md_html.as_str()),
                 None => md_html,
             };
-            let safe_html = &unsafe_html;
 
             println!("{}", out_path.display());
 
             let mut out_file =
                 File::create(out_path.join("index.html")).expect("Could not create file");
 
-            out_file.write_all(safe_html.as_bytes())?;
+            out_file.write_all(html.as_bytes())?;
         }
     }
 
