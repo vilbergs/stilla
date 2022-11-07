@@ -1,14 +1,16 @@
 mod tailwind;
 
-use tailwind::Tailwind;
-
 use ammonia;
 use clap::Parser;
 use comrak::{markdown_to_html, ComrakOptions};
+use serde::Serialize;
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::{env, path::Path};
+use tailwind::Tailwind;
+use tinytemplate::TinyTemplate;
 use walkdir::WalkDir;
 
 /// Simple program to greet a person
@@ -21,6 +23,17 @@ struct Args {
 struct Templates {
     index: Option<String>,
     page: Option<String>,
+}
+
+#[derive(Serialize)]
+struct Page {
+    name: String,
+}
+
+#[derive(Serialize)]
+struct Context {
+    pages: HashMap<String, Vec<Page>>,
+    content: String,
 }
 
 fn main() -> std::io::Result<()> {
@@ -54,11 +67,25 @@ fn main() -> std::io::Result<()> {
         },
     };
 
+    let mut context = Context {
+        pages: HashMap::new(),
+        content: String::new(),
+    };
+
     for entry in WalkDir::new(&pages_dir).into_iter().filter_map(|e| e.ok()) {
-        let f_name = entry.file_name().to_string_lossy();
+        let mut tt = TinyTemplate::new();
+
+        let f_name = entry.file_name().to_string_lossy().to_string();
+        let is_dir = entry.file_type().is_dir();
         let path = entry.path();
 
-        if f_name.ends_with(".md") {
+        // println!("{}", &out_path.display());
+
+        if is_dir {
+            context.pages.insert(f_name.to_owned(), Vec::new());
+        }
+
+        if f_name.ends_with(".md") && !f_name.starts_with("#") {
             let relative_path = path
                 .strip_prefix(&pages_dir)
                 .expect("Could not get relative path to file");
@@ -85,17 +112,40 @@ fn main() -> std::io::Result<()> {
             };
 
             let md_html = ammonia::clean(&markdown_to_html(&contents, &ComrakOptions::default()));
+            context.content = md_html.to_owned();
+
             let html = match template {
                 Some(template_html) => template_html.replace("{{ content }}", md_html.as_str()),
                 None => md_html,
             };
 
-            println!("{}", out_path.display());
+            tt.add_template(out_path.to_str().unwrap(), &html).unwrap();
 
             let mut out_file =
-                File::create(out_path.join("index.html")).expect("Could not create file");
+                File::create(&out_path.join("index.html")).expect("Could not create file");
 
-            out_file.write_all(html.as_bytes())?;
+            let parent = entry
+                .path()
+                .parent()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .split("/")
+                .last()
+                .unwrap();
+
+            println!("{}", parent);
+            if let Some(page_vec) = context.pages.get_mut(parent) {
+                page_vec.push(Page {
+                    name: f_name.to_owned(),
+                })
+            }
+
+            out_file.write_all(
+                tt.render(out_path.to_str().unwrap(), &context)
+                    .unwrap()
+                    .as_bytes(),
+            )?;
         }
     }
 

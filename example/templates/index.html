@@ -10,6 +10,12 @@
   <body class="bg-blue-100">
     This is the index template
 
-    <div class="p-4">{{ content }}</div>
+    <div class="p-4 prose lg:prose-xl">{{ content }}</div>
+
+    <ul>
+      {{ for page in pages.posts }}
+      <li>{page.name}</li>
+      {{ endfor }}
+    </ul>
   </body>
 </html>
