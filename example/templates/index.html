@@ -14,7 +14,7 @@
 
     <ul>
       {{ for page in pages.posts }}
-      <li>{page.name}</li>
+      <li>{page.frontmatter.date} - {page.frontmatter.name}</li>
       {{ endfor }}
     </ul>
   </body>

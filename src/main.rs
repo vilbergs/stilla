@@ -1,8 +1,8 @@
+mod page;
 mod tailwind;
 
-use ammonia;
 use clap::Parser;
-use comrak::{markdown_to_html, ComrakOptions};
+use page::Page;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -23,11 +23,6 @@ struct Args {
 struct Templates {
     index: Option<String>,
     page: Option<String>,
-}
-
-#[derive(Serialize)]
-struct Page {
-    name: String,
 }
 
 #[derive(Serialize)]
@@ -79,10 +74,15 @@ fn main() -> std::io::Result<()> {
         let is_dir = entry.file_type().is_dir();
         let path = entry.path();
 
-        // println!("{}", &out_path.display());
-
         if is_dir {
-            context.pages.insert(f_name.to_owned(), Vec::new());
+            // Make sure the "pages" directory is renamed to "root" to avoid pages.pages reference
+            let key = if f_name == "pages" {
+                f_name.to_owned()
+            } else {
+                String::from("root")
+            };
+
+            context.pages.insert(key, Vec::new());
         }
 
         if f_name.ends_with(".md") && !f_name.starts_with("#") {
@@ -90,8 +90,9 @@ fn main() -> std::io::Result<()> {
                 .strip_prefix(&pages_dir)
                 .expect("Could not get relative path to file");
 
-            let contents =
+            let md_content =
                 fs::read_to_string(&path).expect("Should have been able to read the file");
+            let page = Page::from_md(md_content);
 
             let html_file = relative_path
                 .file_stem()
@@ -111,7 +112,7 @@ fn main() -> std::io::Result<()> {
                 _ => &templates.page,
             };
 
-            let md_html = ammonia::clean(&markdown_to_html(&contents, &ComrakOptions::default()));
+            let md_html = page.html_content();
             context.content = md_html.to_owned();
 
             let html = match template {
@@ -134,11 +135,8 @@ fn main() -> std::io::Result<()> {
                 .last()
                 .unwrap();
 
-            println!("{}", parent);
             if let Some(page_vec) = context.pages.get_mut(parent) {
-                page_vec.push(Page {
-                    name: f_name.to_owned(),
-                })
+                page_vec.push(page)
             }
 
             out_file.write_all(
