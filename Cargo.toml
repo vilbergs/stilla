@@ -12,6 +12,5 @@ comrak = "0.14.0"
 include_dir = {version = "0.7.3", features = ["glob"]}
 serde = {version = "1.0.147", features = ["derive"]}
 serde_yaml = "0.9.14"
-tera = "1.17.1"
 tinytemplate = "1.2.1"
 walkdir = "2.3.2"
