@@ -75,14 +75,7 @@ fn main() -> std::io::Result<()> {
         let path = entry.path();
 
         if is_dir {
-            // Make sure the "pages" directory is renamed to "root" to avoid pages.pages reference
-            let key = if f_name == "pages" {
-                f_name.to_owned()
-            } else {
-                String::from("root")
-            };
-
-            context.pages.insert(key, Vec::new());
+            context.pages.insert(f_name.to_owned(), Vec::new());
         }
 
         if f_name.ends_with(".md") && !f_name.starts_with("#") {
