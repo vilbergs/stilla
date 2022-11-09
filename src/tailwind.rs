@@ -4,7 +4,12 @@ use std::os::unix::prelude::PermissionsExt;
 use std::{env, fs};
 use std::{path::PathBuf, process::Command};
 
-static TAILWIND_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tailwind");
+#[cfg(target_os = "macos")]
+static TAILWIND_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tailwind/macos");
+
+#[cfg(not(target_os = "macos"))]
+static TAILWIND_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tailwind/linux");
+
 static PKG_NAME: &str = env!("CARGO_PKG_NAME");
 
 pub struct Tailwind {}
