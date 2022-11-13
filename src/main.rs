@@ -3,7 +3,6 @@ mod tailwind;
 
 use clap::Parser;
 use page::{Page, PageContext};
-use serde::Serialize;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -11,7 +10,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::{env, path::Path};
 use tailwind::Tailwind;
-use tinytemplate::TinyTemplate;
 use walkdir::WalkDir;
 
 /// Simple program to greet a person
@@ -27,9 +25,7 @@ struct Templates {
 }
 
 struct PageWrapper {
-    filename: String,
     out_path: PathBuf,
-    file_path: PathBuf,
     template_html: String,
     page: Page,
 }
@@ -72,7 +68,6 @@ fn main() -> std::io::Result<()> {
     let mut wrappers: Vec<PageWrapper> = Vec::new();
 
     for entry in root_dir {
-        let mut tt = TinyTemplate::new();
         let f_name = entry.file_name().to_string_lossy().to_string();
         let is_dir = entry.file_type().is_dir();
         let path = entry.path();
@@ -99,7 +94,6 @@ fn main() -> std::io::Result<()> {
                 "index" => out_dir.join(&parent_path),
                 _ => out_dir.join(&parent_path.join(&html_file)),
             };
-            let p = out_path.to_string_lossy().to_string().clone();
 
             std::fs::create_dir_all(&out_path).unwrap();
 
@@ -120,14 +114,11 @@ fn main() -> std::io::Result<()> {
             };
 
             let md_html = page.html_content();
-            let content = md_html.to_owned();
 
             let template_html = match template {
                 Some(template_html) => template_html,
                 None => md_html,
             };
-
-            let out_file_path = out_path.join("index.html");
 
             let parent = entry
                 .path()
@@ -146,9 +137,7 @@ fn main() -> std::io::Result<()> {
             }
 
             wrappers.push(PageWrapper {
-                filename: html_file,
                 out_path,
-                file_path: out_file_path,
                 template_html,
                 page,
             })

@@ -2,7 +2,6 @@ use comrak::{markdown_to_html, ComrakOptions};
 
 use regex::Regex;
 use serde::{Serialize, Serializer};
-use serde_json;
 use std::collections::HashMap;
 use std::{collections::BTreeMap, fs, path::Path};
 use time::format_description;

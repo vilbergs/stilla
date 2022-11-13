@@ -897,7 +897,6 @@ dependencies = [
  "include_dir",
  "regex",
  "serde",
- "serde_json",
  "serde_yaml",
  "time",
  "tinytemplate",
