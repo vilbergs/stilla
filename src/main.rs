@@ -90,9 +90,10 @@ fn main() -> std::io::Result<()> {
                 .to_string();
 
             let parent_path = relative_path.parent().unwrap();
-            let out_path = match html_file.as_str() {
+
+            let out_path = match page.filename.as_str() {
                 "index" => out_dir.join(&parent_path),
-                _ => out_dir.join(&parent_path.join(&html_file)),
+                _ => out_dir.join(&parent_path.join(&page.filename)),
             };
 
             std::fs::create_dir_all(&out_path).unwrap();

@@ -34,7 +34,7 @@ pub struct Page {
     content: String,
     #[serde(serialize_with = "round_serialize")]
     pub date: Option<Date>,
-    filename: String,
+    pub filename: String,
 }
 
 impl Page {
@@ -45,18 +45,18 @@ impl Page {
         let mut filename = path
             .strip_prefix(path.parent().unwrap())
             .unwrap()
-            .file_name()
+            .file_stem()
             .unwrap()
-            .to_str()
-            .unwrap()
-            .to_owned();
+            .to_string_lossy()
+            .to_string();
 
         let mut maybe_date: Option<Date> = None;
 
         if date_regex.is_match(&filename) {
-            let date_part = filename.drain(..10);
-
-            let date_str = date_part.as_str();
+            let new_filename = filename.clone();
+            let mut parts = new_filename.split("_").into_iter();
+            let date_str = parts.next().unwrap();
+            filename = parts.next().unwrap().to_string();
 
             let format = format_description::parse("[year]-[month]-[day]").unwrap();
 
