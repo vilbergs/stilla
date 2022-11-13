@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::{collections::BTreeMap, fs, path::Path};
 use time::format_description;
 use time::Date;
-use tinytemplate::TinyTemplate;
+use tinytemplate::{format_unescaped, TinyTemplate};
 
 #[derive(Serialize)]
 pub struct PageContext {
@@ -90,6 +90,7 @@ impl Page {
 
     pub fn render_from_template(&self, template_html: &str, context: &PageContext) -> String {
         let mut templating_engine = TinyTemplate::new();
+        templating_engine.set_default_formatter(&format_unescaped);
 
         templating_engine
             .add_template("name", &template_html)
