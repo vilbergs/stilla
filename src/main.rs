@@ -2,8 +2,9 @@ mod page;
 mod tailwind;
 
 use clap::Parser;
-use page::Page;
+use page::{Page, PageContext};
 use serde::Serialize;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
@@ -25,10 +26,12 @@ struct Templates {
     page: Option<String>,
 }
 
-#[derive(Serialize)]
-struct Context {
-    pages: HashMap<String, Vec<Page>>,
-    content: String,
+struct PageWrapper {
+    filename: String,
+    out_path: PathBuf,
+    file_path: PathBuf,
+    template_html: String,
+    page: Page,
 }
 
 fn main() -> std::io::Result<()> {
@@ -62,20 +65,20 @@ fn main() -> std::io::Result<()> {
         },
     };
 
-    let mut context = Context {
-        pages: HashMap::new(),
-        content: String::new(),
-    };
+    let root_dir = WalkDir::new(&pages_dir).into_iter().filter_map(|e| e.ok());
 
-    for entry in WalkDir::new(&pages_dir).into_iter().filter_map(|e| e.ok()) {
+    let mut pages = HashMap::new();
+
+    let mut wrappers: Vec<PageWrapper> = Vec::new();
+
+    for entry in root_dir {
         let mut tt = TinyTemplate::new();
-
         let f_name = entry.file_name().to_string_lossy().to_string();
         let is_dir = entry.file_type().is_dir();
         let path = entry.path();
 
         if is_dir {
-            context.pages.insert(f_name.to_owned(), Vec::new());
+            pages.insert(f_name.to_owned(), Vec::new());
         }
 
         if f_name.ends_with(".md") && !f_name.starts_with("#") {
@@ -83,9 +86,7 @@ fn main() -> std::io::Result<()> {
                 .strip_prefix(&pages_dir)
                 .expect("Could not get relative path to file");
 
-            let md_content =
-                fs::read_to_string(&path).expect("Should have been able to read the file");
-            let page = Page::from_md(md_content);
+            let page = Page::from_md_file(path);
 
             let html_file = relative_path
                 .file_stem()
@@ -93,30 +94,40 @@ fn main() -> std::io::Result<()> {
                 .to_string_lossy()
                 .to_string();
 
+            let parent_path = relative_path.parent().unwrap();
             let out_path = match html_file.as_str() {
-                "index" => out_dir.join(relative_path.parent().unwrap()),
-                _ => out_dir.join(relative_path.parent().unwrap().join(&html_file)),
+                "index" => out_dir.join(&parent_path),
+                _ => out_dir.join(&parent_path.join(&html_file)),
             };
+            let p = out_path.to_string_lossy().to_string().clone();
 
             std::fs::create_dir_all(&out_path).unwrap();
 
             let template = match html_file.as_str() {
-                "index" => &templates.index,
-                _ => &templates.page,
+                "index" => {
+                    let parent_dir_name = parent_path.to_str().unwrap().rsplit("/").next().unwrap();
+                    let maybe_dir_template_path =
+                        templates_dir.join(format!("{}.html", parent_dir_name));
+
+                    let index_template = match fs::read_to_string(maybe_dir_template_path) {
+                        Ok(section_template) => Some(section_template),
+                        _ => templates.index.to_owned(),
+                    };
+
+                    index_template
+                }
+                _ => templates.page.to_owned(),
             };
 
             let md_html = page.html_content();
-            context.content = md_html.to_owned();
+            let content = md_html.to_owned();
 
-            let html = match template {
-                Some(template_html) => template_html.replace("{{ content }}", md_html.as_str()),
+            let template_html = match template {
+                Some(template_html) => template_html,
                 None => md_html,
             };
 
-            tt.add_template(out_path.to_str().unwrap(), &html).unwrap();
-
-            let mut out_file =
-                File::create(&out_path.join("index.html")).expect("Could not create file");
+            let out_file_path = out_path.join("index.html");
 
             let parent = entry
                 .path()
@@ -128,16 +139,53 @@ fn main() -> std::io::Result<()> {
                 .last()
                 .unwrap();
 
-            if let Some(page_vec) = context.pages.get_mut(parent) {
-                page_vec.push(page)
+            if let Some(page_vec) = pages.get_mut(parent) {
+                if html_file != "index" {
+                    page_vec.push(page.clone())
+                }
             }
 
-            out_file.write_all(
-                tt.render(out_path.to_str().unwrap(), &context)
-                    .unwrap()
-                    .as_bytes(),
-            )?;
+            wrappers.push(PageWrapper {
+                filename: html_file,
+                out_path,
+                file_path: out_file_path,
+                template_html,
+                page,
+            })
         }
+    }
+
+    // TODO: Implement sorting
+    for vec in pages.values_mut() {
+        vec.sort_by(|a, b| {
+            let ordering = match (a.date, b.date) {
+                (Some(_), None) => Ordering::Greater,
+                (None, Some(_)) => Ordering::Less,
+                (Some(date_a), Some(date_b)) => date_b.cmp(&date_a), // Most recent first
+                _ => Ordering::Equal,
+            };
+
+            return ordering;
+        })
+    }
+
+    for wrapper in wrappers {
+        let mut out_file =
+            File::create(wrapper.out_path.join("index.html")).expect("Could not create page file");
+
+        let ctx = PageContext {
+            pages: pages.clone(),
+            content: wrapper.page.html_content(),
+        };
+
+        out_file
+            .write_all(
+                wrapper
+                    .page
+                    .render_from_template(&wrapper.template_html, &ctx)
+                    .as_bytes(),
+            )
+            .expect("Could not write_template");
     }
 
     Ok(())

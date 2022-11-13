@@ -8,13 +8,13 @@
     <title>Document</title>
   </head>
   <body>
-    This is the <strong>page</strong> template
+    This is the <strong>POSTS</strong> template
 
     <div class="mx-auto p-4">{content}</div>
 
     <ul>
       {{ for page in pages.posts }}
-      <li>{page.date} - {page.frontmatter.name}</li>
+      <li>{page.frontmatter.date} - {page.frontmatter.name}</li>
       {{ endfor }}
     </ul>
   </body>
